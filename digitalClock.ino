@@ -1,3 +1,6 @@
+#define outputA 2
+#define outputB 3
+
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
@@ -8,40 +11,84 @@
 
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 
-void setup() {
+int aState;
+int aLastState;  
+unsigned long previousMillis = 0; // will store last time the clock was updated
+const long interval = 1000; // interval at which to update clock (milliseconds)
+int seconds = 0;
+int minutes = 0;
+int hours = 0;
+
+void setup() { 
+  pinMode(outputA, INPUT);
+  pinMode(outputB, INPUT);
+  
+  Serial.begin(9600);
+  aLastState = digitalRead(outputA); 
+
   myDisplay.begin();
   myDisplay.setIntensity(0);
   myDisplay.displayClear();
+} 
+
+void loop() { 
+  aState = digitalRead(outputA); // Reads the "current" state of the outputA
+  if (aState != aLastState){     
+    if (digitalRead(outputB) != aState) { 
+      incrementClock();
+    } else {
+      decrementClock();
+    }
+    printClock();
+  } 
+  aLastState = aState; // Updates the previous state of the outputA with the current state
+  
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    updateClock();
+    printClock();
+  }
 }
 
-void loop() {
-  static unsigned long lastUpdate = 0;
-  const unsigned long updateInterval = 1000;
-  static int seconds = 0;
-  static int minutes = 0;
-  static int hours = 12;
+void updateClock() {
+  seconds++;
+  if (seconds >= 60) {
+    seconds = 0;
+    incrementClock();
+  }
+}
 
-  if (millis() - lastUpdate >= updateInterval) {
-    lastUpdate = millis();
-    seconds++;
-    if (seconds >= 60) {
-      seconds = 0;
-      minutes++;
-      if (minutes >= 60) {
-        minutes = 0;
-        hours++;
-        if (hours >= 24) {
-          hours = 0;
-        }
-      }
+void incrementClock() {
+  minutes++;
+  if (minutes >= 60) {
+    minutes = 0;
+    hours++;
+    if (hours >= 24) {
+      hours = 0;
     }
   }
+}
 
-  char timeBuffer[6];
-  sprintf(timeBuffer, "%02d:%02d", hours, minutes);
+void decrementClock() {
+  if (minutes == 0) {
+    minutes = 59;
+    if (hours == 0) {
+      hours = 23;
+    } else {
+      hours--;
+    }
+  } else {
+    minutes--;
+  }
+}
 
-  myDisplay.setTextAlignment(PA_CENTER);
-  myDisplay.print(timeBuffer);
+void printClock() {
+  char timeString[6];
+  sprintf(timeString, "%02d:%02d", hours, minutes);
+
+  Serial.println(timeString);
   
-  delay(1000);
+  myDisplay.setTextAlignment(PA_CENTER);
+  myDisplay.print(timeString);
 }
